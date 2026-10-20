@@ -1,12 +1,20 @@
-- uri: template://kubedeploy/backend-route
+- uri: template://kubedeploy/http-route
   type: route
   class: gateway
-  description: Attach the backend API to the shared platform Gateway.
+  description: Attach an application to the shared platform Gateway.
+  init: |
+    {{ if not (hasPrefix "/" .Params.path) }}{{ fail "route path must start with /" }}{{ end }}
+    {{ $ports := (index .WorkloadServices .SourceWorkload).Ports }}
+    {{ $port := index $ports (print .Params.port) }}
+    {{ if not $port.TargetPort }}{{ fail "route port does not match a Service port" }}{{ end }}
+  supported_params:
+    - path
+    - port
   manifests: |
     - apiVersion: gateway.networking.k8s.io/v1
       kind: HTTPRoute
       metadata:
-        name: backend-http
+        name: {{ .SourceWorkload }}-http
         namespace: {{ .Namespace }}
       spec:
         parentRefs:
@@ -19,7 +27,7 @@
           - matches:
               - path:
                   type: PathPrefix
-                  value: /api
+                  value: {{ .Params.path | quote }}
             backendRefs:
               - name: {{ (index .WorkloadServices .SourceWorkload).ServiceName }}
-                port: 8080
+                port: {{ .Params.port }}

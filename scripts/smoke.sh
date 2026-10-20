@@ -3,10 +3,12 @@ set -euo pipefail
 
 context=k3d-kubedeploy
 namespace=kubedeploy-demo
-for condition in Accepted ResolvedRefs; do
-  kubectl --context "$context" --namespace "$namespace" wait \
-    "--for=jsonpath={.status.parents[?(@.parentRef.name==\"kubedeploy\")].conditions[?(@.type==\"$condition\")].status}=True" \
-    httproute/backend-http --timeout=120s
+for route in backend-http frontend-http; do
+  for condition in Accepted ResolvedRefs; do
+    kubectl --context "$context" --namespace "$namespace" wait \
+      "--for=jsonpath={.status.parents[?(@.parentRef.name==\"kubedeploy\")].conditions[?(@.type==\"$condition\")].status}=True" \
+      "httproute/$route" --timeout=120s
+  done
 done
 selector='gateway.envoyproxy.io/owning-gateway-namespace=kubedeploy-gateway,gateway.envoyproxy.io/owning-gateway-name=kubedeploy'
 service="$(kubectl --context "$context" --namespace envoy-gateway-system \
@@ -50,10 +52,45 @@ PY
       --write-out '%{http_code}' --header 'Host: gateway-smoke.invalid' \
       "http://127.0.0.1:$local_port/api/version")"
     [[ "$status" == 404 ]]
-    echo 'Backend Gateway smoke passed: /api/version JSON, route Accepted/ResolvedRefs, foreign hostname HTTP 404'
+    base_url="http://127.0.0.1:$local_port"
+    curl --fail --silent --show-error --max-time 5 --header 'Host: kubedeploy.local' \
+      "$base_url/" >"$work_dir/index.html"
+    asset="$(python3 - "$work_dir/index.html" <<'PY'
+from html.parser import HTMLParser
+import sys
+class Page(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.root = False
+        self.scripts = []
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "div" and attrs.get("id") == "root":
+            self.root = True
+        if tag == "script" and attrs.get("src", "").startswith("/assets/"):
+            self.scripts.append(attrs["src"])
+page = Page()
+with open(sys.argv[1]) as response:
+    page.feed(response.read())
+assert page.root and len(page.scripts) == 1, "Expected the frontend HTML and module script"
+print(page.scripts[0])
+PY
+)"
+    curl --fail --silent --show-error --max-time 5 --header 'Host: kubedeploy.local' \
+      "$base_url$asset" >"$work_dir/asset.js"
+    [[ -s "$work_dir/asset.js" ]]
+    curl --fail --silent --show-error --max-time 5 --header 'Host: kubedeploy.local' \
+      "$base_url/example/nested" >"$work_dir/nested.html"
+    cmp "$work_dir/index.html" "$work_dir/nested.html"
+    for path in /assets/missing.js /api/missing; do
+      status="$(curl --silent --show-error --max-time 5 --output /dev/null \
+        --write-out '%{http_code}' --header 'Host: kubedeploy.local' "$base_url$path")"
+      [[ "$status" == 404 ]]
+    done
+    echo 'Gateway smoke passed: UI, JS asset, SPA fallback, API JSON, both HTTPRoutes, missing asset/API and foreign hostname HTTP 404'
     exit 0
   fi
   sleep 1
 done
-echo 'Backend did not return /api/version through the shared Gateway' >&2
+echo 'Applications did not become ready through the shared Gateway' >&2
 exit 1
