@@ -28,3 +28,6 @@ resources:
   route:
     type: route
     class: gateway
+    params:
+      path: /api
+      port: 8080

@@ -18,6 +18,8 @@
 {{ end }}
 {{ end }}
 {{ if eq $m.kind "Deployment" }}
+{{ $uid := 65532 }}
+{{ if eq $m.metadata.name "frontend" }}{{ $uid = 10001 }}{{ end }}
 - op: set
   path: {{ $i }}.spec.template.spec.automountServiceAccountToken
   value: false
@@ -25,11 +27,27 @@
   path: {{ $i }}.spec.template.spec.securityContext
   value:
     runAsNonRoot: true
-    runAsUser: 65532
-    runAsGroup: 65532
+    runAsUser: {{ $uid }}
+    runAsGroup: {{ $uid }}
     seccompProfile:
       type: RuntimeDefault
+{{ if eq $m.metadata.name "frontend" }}
+- op: set
+  path: {{ $i }}.spec.template.spec.volumes
+  value:
+    - name: tmp
+      emptyDir:
+        medium: Memory
+        sizeLimit: 16Mi
+{{ end }}
 {{ range $c, $_ := $m.spec.template.spec.containers }}
+{{ if eq $m.metadata.name "frontend" }}
+- op: set
+  path: {{ $i }}.spec.template.spec.containers.{{ $c }}.volumeMounts
+  value:
+    - name: tmp
+      mountPath: /tmp
+{{ end }}
 - op: set
   path: {{ $i }}.spec.template.spec.containers.{{ $c }}.imagePullPolicy
   value: IfNotPresent
