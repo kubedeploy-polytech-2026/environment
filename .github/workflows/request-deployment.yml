@@ -1,0 +1,43 @@
+name: Request deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_tag:
+        description: Backend release tag
+        required: true
+        default: v0.1.0
+        type: string
+      frontend_tag:
+        description: Frontend release tag
+        required: true
+        default: v0.1.0
+        type: string
+
+permissions:
+  contents: read
+  attestations: read
+  deployments: write
+
+concurrency:
+  group: request-deployment-local-k3d
+  cancel-in-progress: false
+
+jobs:
+  request:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: main
+      - name: Queue verified releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BACKEND_TAG: ${{ inputs.backend_tag }}
+          FRONTEND_TAG: ${{ inputs.frontend_tag }}
+        run: |
+          python3 scripts/request_deployment.py \
+            --backend-tag "$BACKEND_TAG" --frontend-tag "$FRONTEND_TAG"
