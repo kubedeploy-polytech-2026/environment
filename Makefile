@@ -4,8 +4,9 @@ SHELL := /bin/bash
 BACKEND_IMAGE ?=
 FRONTEND_IMAGE ?=
 SCORE_K8S ?= score-k8s
+ROLLOUT_TIMEOUT_SECONDS ?= 600
 
-.PHONY: help render validate deploy status smoke
+.PHONY: help render validate deploy apply wait execution-contract status smoke
 
 help:
 	@printf '%s\n' \
@@ -13,6 +14,8 @@ help:
 		'  render BACKEND_IMAGE=... FRONTEND_IMAGE=...    Generate application manifests from Score' \
 		'  validate BACKEND_IMAGE=... FRONTEND_IMAGE=...  Render and validate against the local API' \
 		'  deploy BACKEND_IMAGE=... FRONTEND_IMAGE=...    Explicitly deploy both applications to local k3d' \
+		'  apply BACKEND_IMAGE=... FRONTEND_IMAGE=...     Render and apply without waiting' \
+		'  wait ROLLOUT_TIMEOUT_SECONDS=600              Wait for both application rollouts' \
 		'  status                                      Show applications and HTTPRoutes' \
 		'  smoke                                       Check UI and API through the shared Gateway'
 
@@ -25,7 +28,16 @@ validate: render
 	@kubectl --context k3d-kubedeploy apply --server-side --dry-run=server --field-manager=kubedeploy-score -f build/workloads.yaml
 
 deploy: render
-	@BACKEND_IMAGE='$(BACKEND_IMAGE)' FRONTEND_IMAGE='$(FRONTEND_IMAGE)' bash scripts/deploy.sh
+	@BACKEND_IMAGE='$(BACKEND_IMAGE)' FRONTEND_IMAGE='$(FRONTEND_IMAGE)' ROLLOUT_TIMEOUT_SECONDS='$(ROLLOUT_TIMEOUT_SECONDS)' bash scripts/deploy.sh
+
+apply: render
+	@BACKEND_IMAGE='$(BACKEND_IMAGE)' FRONTEND_IMAGE='$(FRONTEND_IMAGE)' DEPLOY_PHASE=apply bash scripts/deploy.sh
+
+wait:
+	@ROLLOUT_TIMEOUT_SECONDS='$(ROLLOUT_TIMEOUT_SECONDS)' bash scripts/wait.sh
+
+execution-contract:
+	@printf '%s\n' 1
 
 status:
 	@kubectl --context k3d-kubedeploy --namespace kubedeploy-demo get deployment,service,httproute
