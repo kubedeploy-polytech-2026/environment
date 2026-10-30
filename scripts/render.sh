@@ -24,6 +24,7 @@ trap 'rm -rf "$work_dir"' EXIT
 cd "$work_dir"
 "$SCORE_K8S" --quiet init --no-sample --no-default-provisioners \
   --provisioners "$project_root/score/route.provisioners.yaml" \
+  --provisioners "$project_root/score/postgres.provisioners.yaml" \
   --patch-templates "$project_root/score/security.tpl"
 "$SCORE_K8S" --quiet generate "$project_root/score/backend.yaml" \
   --image "$BACKEND_IMAGE" --namespace kubedeploy-demo --output workloads.yaml

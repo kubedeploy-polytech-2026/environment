@@ -46,13 +46,24 @@ import json
 import sys
 with open(sys.argv[1]) as response:
     body = json.load(response)
-assert body == {"service": "kubedeploy-backend", "version": "0.1.0"}, body
+assert body == {"service": "kubedeploy-backend", "version": "0.2.0"}, body
 PY
     status="$(curl --silent --show-error --max-time 5 --output /dev/null \
       --write-out '%{http_code}' --header 'Host: gateway-smoke.invalid' \
       "http://127.0.0.1:$local_port/api/version")"
     [[ "$status" == 404 ]]
     base_url="http://127.0.0.1:$local_port"
+    curl --fail --silent --show-error --max-time 5 --header 'Host: kubedeploy.local' \
+      "$base_url/api/notes" >"$work_dir/notes.json"
+    python3 - "$work_dir/notes.json" <<'PY'
+import json
+import sys
+with open(sys.argv[1]) as response:
+    notes = json.load(response)
+assert isinstance(notes, list), "Expected the persisted notes list"
+assert all(isinstance(n, dict) and isinstance(n.get("id"), int) and
+           isinstance(n.get("text"), str) and isinstance(n.get("created_at"), str) for n in notes)
+PY
     curl --fail --silent --show-error --max-time 5 --header 'Host: kubedeploy.local' \
       "$base_url/" >"$work_dir/index.html"
     asset="$(python3 - "$work_dir/index.html" <<'PY'
@@ -87,7 +98,7 @@ PY
         --write-out '%{http_code}' --header 'Host: kubedeploy.local' "$base_url$path")"
       [[ "$status" == 404 ]]
     done
-    echo 'Gateway smoke passed: UI, JS asset, SPA fallback, API JSON, both HTTPRoutes, missing asset/API and foreign hostname HTTP 404'
+    echo 'Gateway smoke passed: UI, JS asset, SPA fallback, API JSON, PostgreSQL notes, both HTTPRoutes, missing asset/API and foreign hostname HTTP 404'
     exit 0
   fi
   sleep 1

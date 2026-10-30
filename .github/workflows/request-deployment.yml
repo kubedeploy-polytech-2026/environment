@@ -6,7 +6,7 @@ on:
       backend_tag:
         description: Backend release tag
         required: true
-        default: v0.1.0
+        default: v0.2.0
         type: string
       frontend_tag:
         description: Frontend release tag

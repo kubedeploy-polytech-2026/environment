@@ -1,0 +1,8 @@
+- uri: template://kubedeploy/existing-postgres
+  type: postgres
+  class: existing
+  description: Reference PostgreSQL credentials prepared by the Helm bootstrap.
+  outputs: |
+    url: {{ encodeSecretRef "postgres-credentials" "url" | quote }}
+  expected_outputs:
+    - url
