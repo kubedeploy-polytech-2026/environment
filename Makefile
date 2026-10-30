@@ -49,7 +49,7 @@ database-up:
 	@bash scripts/database-up.sh
 
 database-status:
-	@kubectl --context k3d-kubedeploy --namespace kubedeploy-demo get statefulset/postgres,service/postgres,persistentvolumeclaim
+	@kubectl --context k3d-kubedeploy --namespace kubedeploy-demo get statefulset/postgres service/postgres persistentvolumeclaim/data-postgres-0
 
 database-smoke:
 	@python3 scripts/database-smoke.py
