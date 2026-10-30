@@ -6,7 +6,7 @@ FRONTEND_IMAGE ?=
 SCORE_K8S ?= score-k8s
 ROLLOUT_TIMEOUT_SECONDS ?= 600
 
-.PHONY: help render validate deploy apply wait execution-contract status smoke
+.PHONY: help render validate deploy apply wait execution-contract status smoke database-up database-status database-smoke
 
 help:
 	@printf '%s\n' \
@@ -44,3 +44,12 @@ status:
 
 smoke:
 	@bash scripts/smoke.sh
+
+database-up:
+	@bash scripts/database-up.sh
+
+database-status:
+	@kubectl --context k3d-kubedeploy --namespace kubedeploy-demo get statefulset/postgres,service/postgres,persistentvolumeclaim
+
+database-smoke:
+	@python3 scripts/database-smoke.py

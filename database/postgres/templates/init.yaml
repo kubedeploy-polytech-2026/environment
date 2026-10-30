@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-init
+data:
+  01-application.sql: |
+    \getenv app_password PG_APP_PASSWORD
+    CREATE ROLE {{ .Values.database.user | quote }} LOGIN PASSWORD :'app_password';
+    GRANT CONNECT ON DATABASE {{ .Values.database.name | quote }} TO {{ .Values.database.user | quote }};
+    CREATE SCHEMA app AUTHORIZATION {{ .Values.database.user | quote }};
+    ALTER ROLE {{ .Values.database.user | quote }} IN DATABASE {{ .Values.database.name | quote }} SET search_path TO app, public;
