@@ -1,2 +1,5 @@
 build/
 .score-k8s/
+.tools/
+__pycache__/
+postgres-trivy.json

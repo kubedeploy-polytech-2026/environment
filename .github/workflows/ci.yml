@@ -26,6 +26,30 @@ jobs:
       - name: Check shell syntax
         run: |
           for script in scripts/*.sh; do bash -n "$script"; done
+      - name: Check PostgreSQL chart
+        run: |
+          helm lint database/postgres
+          helm template postgres database/postgres --namespace kubedeploy-demo > /tmp/postgres.yaml
+      - name: Install pinned Trivy
+        run: bash scripts/install-trivy.sh
+      - name: Report upstream PostgreSQL vulnerabilities
+        run: |
+          image="$(helm template postgres database/postgres --show-only templates/statefulset.yaml | sed -n 's/^          image: "\(.*\)"/\1/p')"
+          .tools/bin/trivy image --quiet --timeout 5m --db-repository ghcr.io/aquasecurity/trivy-db:2 \
+            --scanners vuln --ignore-unfixed --severity HIGH,CRITICAL --format json \
+            --output postgres-trivy.json "$image"
+          count="$(jq '[.Results[]?.Vulnerabilities[]?] | length' postgres-trivy.json)"
+          if (( count > 0 )); then
+            echo "::warning::Upstream PostgreSQL image has $count HIGH/CRITICAL findings; see postgres-trivy artifact"
+          fi
+      - name: Upload PostgreSQL vulnerability report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: postgres-trivy
+          path: postgres-trivy.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Verify published release inputs without creating a request
         env:
           GH_TOKEN: ${{ github.token }}
